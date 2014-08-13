@@ -21,22 +21,28 @@ def tail_recurse(fn):
     for byte, arg in consume(code_obj.co_code):
         name = opcode.opname[byte]
         if name == "LOAD_GLOBAL" and code_obj.co_names[arg] == fn.__name__:
-            jump_displacement -= 3
+            new_bytecode.append(opmap["NOP"])
+            new_bytecode.append(opmap["NOP"])
+            new_bytecode.append(opmap["NOP"])
         elif name == "CALL_FUNCTION":
             for i in range(arg): # 0, 1
                 new_bytecode.append(opmap["STORE_FAST"])
                 new_bytecode += split(arg - i - 1)
             new_bytecode.append(opmap["JUMP_ABSOLUTE"])
-            new_bytecode += split(0) # jump to beginning of bytecode
+            new_bytecode += split(-jump_displacement) # jump to beginning of bytecode
+            # new_bytecode += split(0) # jump to beginning of bytecode
             jump_displacement += 3 * arg
         else:
             new_bytecode.append(byte)
             if arg is not None:
                 new_bytecode += split(arg)
-        if byte > opcode.HAVE_ARGUMENT:
+
+        if arg is not None:
             jump_list.append(jump_displacement)
             jump_list.append(jump_displacement)
         jump_list.append(jump_displacement)
+
+    assert len(jump_list) == len(code_obj.co_code)
 
     newer_bytecode = []
     for byte, arg in consume(new_bytecode):
@@ -47,6 +53,17 @@ def tail_recurse(fn):
         if arg is not None:
             newer_bytecode += split(arg)
 
+    print fn.__name__
+    print code_obj.co_code
+    print jump_list
+    print new_bytecode
+    print newer_bytecode
+    print "old"
+    print dis.dis(code_obj.co_code)
+    print "new"
+    print dis.dis("".join([chr(b) for b in new_bytecode]))
+    print "newer"
+    print dis.dis("".join([chr(b) for b in newer_bytecode]))
     return "".join([chr(b) for b in newer_bytecode])
 
 def split(num):
@@ -76,12 +93,14 @@ def fact(n, accum):
     else:
         return fact(n-1, accum*n)
 
+@make_tail_recursive
 def fact2(n, accum):
     if n > 1:
         return fact2(n-1, accum*n)
     else:
         return accum
 
+@make_tail_recursive
 def fact3(n, accum):
     x = fact3
     if n <= 1:
@@ -93,10 +112,7 @@ def fact3(n, accum):
 
 
 if __name__ == '__main__':
-    # print fact(1000,1)
-    # print dis.dis(fact)
-
-    fact2 = make_tail_recursive(fact2)
-    dis.dis(fact2)
+    print fact(1000,1)
     print fact2(1000, 1)
-    # fact3 = make_tail_recursive(fact3)
+    # print dis.dis(fact3)
+    print fact3(1000, 1)
